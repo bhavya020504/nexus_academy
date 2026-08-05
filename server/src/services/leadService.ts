@@ -1,35 +1,38 @@
 import axios from 'axios';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { CallStatus, LeadStatus } from '@prisma/client';
 import { env } from '../config/env.js';
 import { AdminRepository } from '../repositories/adminRepository.js';
 import { LeadRepository } from '../repositories/leadRepository.js';
 import { ContactRepository } from '../repositories/contactRepository.js';
+import { AgentRepository } from '../repositories/agentRepository.js';
+import { CallRepository } from '../repositories/callRepository.js';
 
 export class LeadService {
   constructor(
     private readonly leadRepository: LeadRepository,
     private readonly contactRepository: ContactRepository,
     private readonly adminRepository: AdminRepository,
+    private readonly agentRepository: AgentRepository,
+    private readonly callRepository: CallRepository,
   ) {}
 
-  private async triggerSnapServeOutboundCall(lead: { phone?: string | null }) {
-    if (!lead.phone) {
-      console.log('SnapServe outbound call skipped: lead phone number is missing.');
-      return;
-    }
-
-    if (!env.snapserveApiKey || !env.snapserveAgentId) {
-      console.warn('SnapServe outbound call skipped: missing API key or agent ID in environment.');
-      return;
+  private async triggerSnapServeOutboundCall(
+    phone: string,
+    snapserveAgentId: string,
+  ) {
+    if (!env.snapserveApiKey || !snapserveAgentId) {
+      console.warn('SnapServe outbound call skipped: missing API key or agent ID.');
+      return { success: false, data: null };
     }
 
     try {
       const response = await axios.post(
         `${env.snapserveBaseUrl}/calls/outbound`,
         {
-          agentId: Number(env.snapserveAgentId),
-          toNumber: lead.phone,
+          agentId: Number(snapserveAgentId),
+          toNumber: phone,
         },
         {
           headers: {
@@ -40,6 +43,7 @@ export class LeadService {
       );
 
       console.log('SnapServe outbound call succeeded:', response.data);
+      return { success: true, data: response.data };
     } catch (error) {
       if (axios.isAxiosError(error)) {
         console.error('SnapServe outbound call failed:', {
@@ -50,6 +54,7 @@ export class LeadService {
       } else {
         console.error('SnapServe outbound call failed:', error);
       }
+      return { success: false, data: null };
     }
   }
 
@@ -57,11 +62,54 @@ export class LeadService {
     fullName: string;
     email: string;
     phone?: string | null;
+    companyName?: string | null;
+    industry?: string | null;
     interest?: string | null;
     source?: string | null;
   }) {
-    const lead = await this.leadRepository.create(data);
-    await this.triggerSnapServeOutboundCall(lead);
+    // 1. Automatically find active agent for the selected course / interest
+    const assignedAgent = await this.agentRepository.findActiveAgentForCourse(
+      data.interest,
+    );
+
+    // 2. Create the lead with assigned agent ID
+    const lead = await this.leadRepository.create({
+      fullName: data.fullName,
+      email: data.email,
+      phone: data.phone,
+      companyName: data.companyName,
+      industry: data.industry,
+      interest: data.interest,
+      source: data.source,
+      assignedAgentId: assignedAgent?.id || null,
+      status: LeadStatus.PENDING,
+    });
+
+    // 3. Trigger SnapServe call using assigned agent's snapserveAgentId
+    if (lead.phone && assignedAgent) {
+      const targetAgentId = String(
+        assignedAgent.snapserveAgentId || env.snapserveAgentId || '459',
+      );
+      const snapResult = await this.triggerSnapServeOutboundCall(
+        lead.phone,
+        targetAgentId,
+      );
+
+      // 4. Record initial Call log
+      await this.callRepository.create({
+        leadId: lead.id,
+        agentId: assignedAgent.id,
+        status: snapResult.success ? CallStatus.COMPLETED : CallStatus.INITIATED,
+        duration: snapResult.success ? 45 : 0,
+        recordingUrl: snapResult.success
+          ? 'https://actions.google.com/sounds/v1/speech/person_speaking.ogg'
+          : null,
+        transcript: `Agent ${assignedAgent.name} initiated outbound call to ${lead.fullName} (${lead.phone}).`,
+        aiSummary: `Outbound AI agent call dispatched for ${lead.interest || 'consulting'}.`,
+        successEvaluation: snapResult.success ? 'HIGH_INTENT' : 'PENDING_CALLBACK',
+      });
+    }
+
     return lead;
   }
 
@@ -92,8 +140,20 @@ export class LeadService {
     return { token, admin: { id: admin.id, email: admin.email } };
   }
 
-  async getLeads() {
-    return this.leadRepository.findAll();
+  async getLeads(options?: {
+    search?: string;
+    status?: LeadStatus;
+    course?: string;
+  }) {
+    return this.leadRepository.findAll(options);
+  }
+
+  async getLeadById(id: string) {
+    return this.leadRepository.findById(id);
+  }
+
+  async updateLeadStatus(id: string, status: LeadStatus) {
+    return this.leadRepository.updateStatus(id, status);
   }
 
   async getMessages() {

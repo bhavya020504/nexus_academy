@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
+import { LeadStatus } from '@prisma/client';
 import { LeadService } from '../services/leadService.js';
-import { leadSchema, adminLoginSchema } from '../validators/lead.js';
+import { leadSchema, leadStatusSchema, adminLoginSchema } from '../validators/lead.js';
 import { contactMessageSchema } from '../validators/contact.js';
 
 export class LeadController {
@@ -15,6 +16,7 @@ export class LeadController {
       next(error);
     }
   };
+
   createContactMessage = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = contactMessageSchema.parse(req.body);
@@ -35,10 +37,42 @@ export class LeadController {
     }
   };
 
-  getLeads = async (_req: Request, res: Response, next: NextFunction) => {
+  getLeads = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const leads = await this.leadService.getLeads();
+      const { search, status, course } = req.query;
+
+      const leads = await this.leadService.getLeads({
+        search: typeof search === 'string' ? search : undefined,
+        status: typeof status === 'string' ? (status as LeadStatus) : undefined,
+        course: typeof course === 'string' ? course : undefined,
+      });
+
       res.status(200).json({ success: true, data: leads });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getLeadById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const lead = await this.leadService.getLeadById(id);
+      if (!lead) {
+        res.status(404).json({ success: false, message: 'Lead not found' });
+        return;
+      }
+      res.status(200).json({ success: true, data: lead });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateLeadStatus = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const parsed = leadStatusSchema.parse(req.body);
+      const updated = await this.leadService.updateLeadStatus(id, parsed.status as LeadStatus);
+      res.status(200).json({ success: true, data: updated });
     } catch (error) {
       next(error);
     }
