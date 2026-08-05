@@ -68,30 +68,42 @@ export class AgentRepository {
     });
   }
 
-  async findActiveAgentForCourse(courseName?: string | null) {
-    if (!courseName) {
-      return prisma.agent.findFirst({
-        where: { isActive: true },
-        orderBy: { createdAt: 'asc' },
-      });
-    }
-
-    // 1. Try to find an active agent mapped to this courseName
-    const agentCourse = await prisma.agentCourse.findFirst({
+  async pruneStaleAgents(validSnapServeIds: string[]) {
+    if (!validSnapServeIds || validSnapServeIds.length === 0) return;
+    await prisma.agent.deleteMany({
       where: {
-        courseName: { equals: courseName, mode: 'insensitive' },
-        agent: { isActive: true },
+        snapserveAgentId: {
+          notIn: validSnapServeIds,
+        },
       },
-      include: { agent: true },
     });
+  }
 
-    if (agentCourse?.agent) {
-      return agentCourse.agent;
+  async findActiveAgentForCourse(courseName?: string | null) {
+    if (courseName) {
+      // 1. Try to find an active agent mapped to this courseName
+      const agentCourse = await prisma.agentCourse.findFirst({
+        where: {
+          courseName: { equals: courseName, mode: 'insensitive' },
+          agent: { isActive: true },
+        },
+        include: { agent: true },
+      });
+
+      if (agentCourse?.agent) {
+        return agentCourse.agent;
+      }
     }
 
     // 2. Fallback to any active agent if no course-specific agent is found
-    return prisma.agent.findFirst({
+    const activeAgent = await prisma.agent.findFirst({
       where: { isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (activeAgent) return activeAgent;
+
+    // 3. Fallback to any agent
+    return prisma.agent.findFirst({
       orderBy: { createdAt: 'asc' },
     });
   }

@@ -8,6 +8,7 @@ import { LeadRepository } from '../repositories/leadRepository.js';
 import { ContactRepository } from '../repositories/contactRepository.js';
 import { AgentRepository } from '../repositories/agentRepository.js';
 import { CallRepository } from '../repositories/callRepository.js';
+import { AgentService } from './agentService.js';
 
 export class LeadService {
   constructor(
@@ -18,41 +19,77 @@ export class LeadService {
     private readonly callRepository: CallRepository,
   ) {}
 
+  private formatPhoneNumber(rawPhone: string): string {
+    if (!rawPhone) return '';
+    const cleaned = rawPhone.replace(/[^\d+]/g, '');
+    if (cleaned.startsWith('+')) {
+      return cleaned;
+    }
+    // 10-digit Indian number standard format
+    if (cleaned.length === 10) {
+      return `+91${cleaned}`;
+    }
+    // 11-digit US number format
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      return `+${cleaned}`;
+    }
+    // 12-digit Indian number format
+    if (cleaned.length === 12 && cleaned.startsWith('91')) {
+      return `+${cleaned}`;
+    }
+    return `+${cleaned}`;
+  }
+
   private async triggerSnapServeOutboundCall(
     phone: string,
     snapserveAgentId: string,
   ) {
-    if (!env.snapserveApiKey || !snapserveAgentId) {
-      console.warn('SnapServe outbound call skipped: missing API key or agent ID.');
+    const formattedPhone = this.formatPhoneNumber(phone);
+    const agentIdNum = Number(snapserveAgentId);
+
+    if (!env.snapserveApiKey || !agentIdNum || isNaN(agentIdNum)) {
+      console.warn('SnapServe outbound call skipped: missing API key or invalid agent ID.', {
+        hasApiKey: !!env.snapserveApiKey,
+        snapserveAgentId,
+        agentIdNum,
+      });
       return { success: false, data: null };
     }
 
-    try {
-      const response = await axios.post(
-        `${env.snapserveBaseUrl}/calls/outbound`,
-        {
-          agentId: Number(snapserveAgentId),
-          toNumber: phone,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${env.snapserveApiKey}`,
-            'Content-Type': 'application/json',
-          },
-        },
-      );
+    const endpoint = `${env.snapserveBaseUrl.replace(/\/$/, '')}/calls/outbound`;
+    const payload = {
+      agentId: agentIdNum,
+      toNumber: formattedPhone,
+    };
+    const headers = {
+      Authorization: `Bearer ${env.snapserveApiKey}`,
+      'Content-Type': 'application/json',
+    };
 
-      console.log('SnapServe outbound call succeeded:', response.data);
+    console.log('--- SnapServe Outbound Call Request ---');
+    console.log(`Endpoint: ${endpoint}`);
+    console.log(`Headers: Authorization: Bearer *** (Key configured)`);
+    console.log(`Payload:`, JSON.stringify(payload, null, 2));
+
+    try {
+      const response = await axios.post(endpoint, payload, {
+        headers,
+        timeout: 15000,
+      });
+
+      console.log('--- SnapServe Outbound Call Response ---');
+      console.log(`Status Code: ${response.status} ${response.statusText}`);
+      console.log(`Response Body:`, JSON.stringify(response.data, null, 2));
+
       return { success: true, data: response.data };
     } catch (error) {
+      console.error('--- SnapServe Outbound Call Failed ---');
       if (axios.isAxiosError(error)) {
-        console.error('SnapServe outbound call failed:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message,
-        });
+        console.error(`Status Code: ${error.response?.status || 'N/A'}`);
+        console.error(`Status Text: ${error.response?.statusText || 'N/A'}`);
+        console.error(`Full Error Payload:`, JSON.stringify(error.response?.data || {}, null, 2));
       } else {
-        console.error('SnapServe outbound call failed:', error);
+        console.error(`Error:`, error);
       }
       return { success: false, data: null };
     }
@@ -67,12 +104,27 @@ export class LeadService {
     interest?: string | null;
     source?: string | null;
   }) {
-    // 1. Automatically find active agent for the selected course / interest
+    // 1. Synchronize live SnapServe agents to prune stale legacy DB records
+    try {
+      const agentService = new AgentService(this.agentRepository);
+      await agentService.getAgents();
+    } catch (err) {
+      console.warn('Live agent synchronization prior to lead creation skipped:', err);
+    }
+
+    // 2. Automatically find active agent for the selected course / interest
     const assignedAgent = await this.agentRepository.findActiveAgentForCourse(
       data.interest,
     );
 
-    // 2. Create the lead with assigned agent ID
+    console.log('Automatic Agent Assignment Result:', {
+      courseInterest: data.interest,
+      assignedAgentId: assignedAgent?.id,
+      assignedAgentName: assignedAgent?.name,
+      snapserveAgentId: assignedAgent?.snapserveAgentId,
+    });
+
+    // 3. Create the lead in PostgreSQL database
     const lead = await this.leadRepository.create({
       fullName: data.fullName,
       email: data.email,
@@ -85,29 +137,28 @@ export class LeadService {
       status: LeadStatus.PENDING,
     });
 
-    // 3. Trigger SnapServe call using assigned agent's snapserveAgentId
-    if (lead.phone && assignedAgent) {
+    // 4. Trigger SnapServe call using assigned agent's snapserveAgentId
+    if (lead.phone) {
       const targetAgentId = String(
-        assignedAgent.snapserveAgentId || env.snapserveAgentId || '459',
+        assignedAgent?.snapserveAgentId || env.snapserveAgentId || '459',
       );
       const snapResult = await this.triggerSnapServeOutboundCall(
         lead.phone,
         targetAgentId,
       );
 
-      // 4. Record initial Call log
-      await this.callRepository.create({
-        leadId: lead.id,
-        agentId: assignedAgent.id,
-        status: snapResult.success ? CallStatus.COMPLETED : CallStatus.INITIATED,
-        duration: snapResult.success ? 45 : 0,
-        recordingUrl: snapResult.success
-          ? 'https://actions.google.com/sounds/v1/speech/person_speaking.ogg'
-          : null,
-        transcript: `Agent ${assignedAgent.name} initiated outbound call to ${lead.fullName} (${lead.phone}).`,
-        aiSummary: `Outbound AI agent call dispatched for ${lead.interest || 'consulting'}.`,
-        successEvaluation: snapResult.success ? 'HIGH_INTENT' : 'PENDING_CALLBACK',
-      });
+      // 5. Record initial Call log in PostgreSQL
+      if (assignedAgent) {
+        await this.callRepository.create({
+          leadId: lead.id,
+          agentId: assignedAgent.id,
+          status: snapResult.success ? CallStatus.INITIATED : CallStatus.FAILED,
+          duration: 0,
+          transcript: `Agent ${assignedAgent.name} initiated outbound call to ${lead.fullName} (${lead.phone}).`,
+          aiSummary: `Outbound AI agent call dispatched for ${lead.interest || 'consulting'}.`,
+          successEvaluation: snapResult.success ? 'INITIATED' : 'FAILED',
+        });
+      }
     }
 
     return lead;

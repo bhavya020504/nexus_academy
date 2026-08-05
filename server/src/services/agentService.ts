@@ -10,6 +10,10 @@ export class AgentService {
   async getAgents() {
     try {
       const snapAgents = await this.snapServeService.fetchAgents();
+      const validIds = snapAgents.map((sa) => String(sa.id));
+
+      // Prune legacy database records that do not exist in live SnapServe API
+      await this.agentRepository.pruneStaleAgents(validIds);
 
       // Synchronize each SnapServe agent into Postgres & attach database mappings
       const enrichedAgents = await Promise.all(
