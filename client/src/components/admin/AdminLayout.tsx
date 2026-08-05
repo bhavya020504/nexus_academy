@@ -19,17 +19,14 @@ interface AdminLayoutProps {
 export function AdminLayout({ children }: AdminLayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
-  const [adminEmail, setAdminEmail] = useState<string | null>(null)
+  const [adminEmail, setAdminEmail] = useState<string>('admin@ainexus.com')
 
   useEffect(() => {
-    const token = localStorage.getItem('nexus_admin_token')
     const email = localStorage.getItem('nexus_admin_email')
-    if (!token) {
-      navigate('/admin/login')
-    } else {
-      setAdminEmail(email || 'admin@ainexus.com')
+    if (email) {
+      setAdminEmail(email)
     }
-  }, [navigate])
+  }, [])
 
   const handleLogout = () => {
     localStorage.removeItem('nexus_admin_token')

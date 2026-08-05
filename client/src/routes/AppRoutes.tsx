@@ -12,6 +12,14 @@ import { AdminAgentsPage } from '../pages/admin/AdminAgents'
 import { AdminCallsPage } from '../pages/admin/AdminCalls'
 import { AdminAnalyticsPage } from '../pages/admin/AdminAnalytics'
 
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = localStorage.getItem('nexus_admin_token')
+  if (!token) {
+    return <Navigate to="/admin/login" replace />
+  }
+  return <>{children}</>
+}
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -21,14 +29,58 @@ export function AppRoutes() {
       <Route path="/courses" element={<CoursesPage />} />
       <Route path="/contact" element={<ContactPage />} />
 
-      {/* Admin CRM Portal Routes */}
+      {/* Admin Login (Public) */}
       <Route path="/admin/login" element={<AdminLoginPage />} />
-      <Route path="/admin" element={<AdminDashboardPage />} />
-      <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-      <Route path="/admin/leads" element={<AdminLeadsPage />} />
-      <Route path="/admin/agents" element={<AdminAgentsPage />} />
-      <Route path="/admin/calls" element={<AdminCallsPage />} />
-      <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+
+      {/* Protected Admin CRM Portal Routes */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/dashboard"
+        element={
+          <ProtectedRoute>
+            <AdminDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/leads"
+        element={
+          <ProtectedRoute>
+            <AdminLeadsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/agents"
+        element={
+          <ProtectedRoute>
+            <AdminAgentsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/calls"
+        element={
+          <ProtectedRoute>
+            <AdminCallsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/analytics"
+        element={
+          <ProtectedRoute>
+            <AdminAnalyticsPage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Fallback */}
       <Route path="/404" element={<NotFoundPage />} />
