@@ -6,6 +6,7 @@ import {
   Bot,
   PhoneCall,
   BarChart3,
+  BookOpen,
   LogOut,
   Sparkles,
   ShieldAlert,
@@ -36,6 +37,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   const navItems = [
     { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
+    { label: 'Course Management', path: '/admin/courses', icon: BookOpen },
     { label: 'Lead Management', path: '/admin/leads', icon: Users },
     { label: 'Agent Management', path: '/admin/agents', icon: Bot },
     { label: 'Call Management', path: '/admin/calls', icon: PhoneCall },

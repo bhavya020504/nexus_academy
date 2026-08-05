@@ -25,8 +25,53 @@ async function main() {
     },
   });
 
-  // 2. Seed Courses
+  // 2. Seed Courses (including requested courses: Full Stack AI, Data Analytics, GenAI & LLM, AI Consulting, Python for AI, etc.)
   const coursesData = [
+    {
+      title: 'Full Stack AI',
+      description: 'End-to-end full stack AI application development with React, Node, and Python LLM microservices.',
+      level: 'Intermediate',
+      duration: '10 weeks',
+      price: 1499,
+      slug: 'full-stack-ai',
+      isActive: true,
+    },
+    {
+      title: 'Data Analytics',
+      description: 'Modern data analytics, SQL, Python, and automated business intelligence dashboards.',
+      level: 'Beginner',
+      duration: '6 weeks',
+      price: 699,
+      slug: 'data-analytics',
+      isActive: true,
+    },
+    {
+      title: 'GenAI & LLM',
+      description: 'Generative AI engineering, fine-tuning LLMs, agentic workflows, and RAG architectures.',
+      level: 'Advanced',
+      duration: '8 weeks',
+      price: 1599,
+      slug: 'genai-and-llm',
+      isActive: true,
+    },
+    {
+      title: 'AI Consulting',
+      description: 'Enterprise AI strategy, digital transformation frameworks, and ROI advisory.',
+      level: 'Executive',
+      duration: '4 weeks',
+      price: 1199,
+      slug: 'ai-consulting',
+      isActive: true,
+    },
+    {
+      title: 'Python for AI',
+      description: 'Foundational and scientific Python programming for machine learning, PyTorch, and NumPy.',
+      level: 'Beginner',
+      duration: '6 weeks',
+      price: 599,
+      slug: 'python-for-ai',
+      isActive: true,
+    },
     {
       title: 'Executive AI Leadership & Strategy',
       description: 'C-suite strategy for deploying enterprise generative AI and automation frameworks.',
@@ -34,6 +79,7 @@ async function main() {
       duration: '4 weeks',
       price: 1299,
       slug: 'executive-ai-leadership',
+      isActive: true,
     },
     {
       title: 'Enterprise Generative AI & LLM Systems',
@@ -42,6 +88,7 @@ async function main() {
       duration: '8 weeks',
       price: 1899,
       slug: 'enterprise-generative-ai-llm',
+      isActive: true,
     },
     {
       title: 'AI Product Management & Architecture',
@@ -50,22 +97,7 @@ async function main() {
       duration: '6 weeks',
       price: 999,
       slug: 'ai-product-management',
-    },
-    {
-      title: 'Prompt Engineering Mastery',
-      description: 'Write, test, and refine system prompts to drive deterministic AI outputs.',
-      level: 'Intermediate',
-      duration: '4 weeks',
-      price: 499,
-      slug: 'prompt-engineering-mastery',
-    },
-    {
-      title: 'AI Strategy Consulting Sprint',
-      description: 'Build a practical AI adoption roadmap for fast-scaling companies.',
-      level: 'Advanced',
-      duration: '6 weeks',
-      price: 799,
-      slug: 'ai-strategy-consulting-sprint',
+      isActive: true,
     },
   ];
 
@@ -87,9 +119,9 @@ async function main() {
       languages: 'English, Spanish',
       isActive: true,
       supportedCourseNames: [
+        'Full Stack AI',
         'Executive AI Leadership & Strategy',
-        'AI Strategy Consulting Sprint',
-        'Executive AI Leadership',
+        'AI Consulting',
       ],
     },
     {
@@ -98,8 +130,9 @@ async function main() {
       languages: 'English, German',
       isActive: true,
       supportedCourseNames: [
+        'GenAI & LLM',
         'Enterprise Generative AI & LLM Systems',
-        'AI Product Management & Architecture',
+        'Python for AI',
       ],
     },
     {
@@ -108,8 +141,9 @@ async function main() {
       languages: 'English, French',
       isActive: true,
       supportedCourseNames: [
-        'Prompt Engineering Mastery',
+        'Data Analytics',
         'AI Product Management & Architecture',
+        'Python for AI',
       ],
     },
   ];
@@ -139,26 +173,22 @@ async function main() {
       });
     }
 
-    // Link agent to courses
+    // Clear existing agentCourses links and recreate
+    await prisma.agentCourse.deleteMany({ where: { agentId: agent.id } });
+
     for (const courseName of a.supportedCourseNames) {
       const courseId = createdCourses[courseName] || null;
-      const existingLink = await prisma.agentCourse.findFirst({
-        where: { agentId: agent.id, courseName },
+      await prisma.agentCourse.create({
+        data: {
+          agentId: agent.id,
+          courseId,
+          courseName,
+        },
       });
-
-      if (!existingLink) {
-        await prisma.agentCourse.create({
-          data: {
-            agentId: agent.id,
-            courseId,
-            courseName,
-          },
-        });
-      }
     }
   }
 
-  // Fetch agents for creating sample leads
+  // Fetch agents for sample leads
   const sarah = await prisma.agent.findFirst({ where: { snapserveAgentId: '459' } });
   const alex = await prisma.agent.findFirst({ where: { snapserveAgentId: '460' } });
   const elena = await prisma.agent.findFirst({ where: { snapserveAgentId: '461' } });
@@ -171,7 +201,7 @@ async function main() {
       phone: '+1 (555) 234-8901',
       companyName: 'TechCorp Solutions',
       industry: 'Fintech',
-      interest: 'Executive AI Leadership & Strategy',
+      interest: 'Full Stack AI',
       source: 'Google Search',
       status: LeadStatus.QUALIFIED,
       assignedAgentId: sarah?.id,
@@ -182,7 +212,7 @@ async function main() {
       phone: '+1 (555) 876-5432',
       companyName: 'Innovate AI Labs',
       industry: 'Software',
-      interest: 'Enterprise Generative AI & LLM Systems',
+      interest: 'GenAI & LLM',
       source: 'LinkedIn Ad',
       status: LeadStatus.CONTACTED,
       assignedAgentId: alex?.id,
@@ -193,20 +223,9 @@ async function main() {
       phone: '+1 (555) 345-6789',
       companyName: 'Nexus Healthcare',
       industry: 'Healthcare',
-      interest: 'AI Product Management & Architecture',
+      interest: 'Data Analytics',
       source: 'Direct Referral',
       status: LeadStatus.CONVERTED,
-      assignedAgentId: elena?.id,
-    },
-    {
-      fullName: 'Emily Taylor',
-      email: 'emily.t@retailpulse.com',
-      phone: '+1 (555) 901-2345',
-      companyName: 'RetailPulse Inc.',
-      industry: 'E-commerce',
-      interest: 'Prompt Engineering Mastery',
-      source: 'Webinar Signup',
-      status: LeadStatus.PENDING,
       assignedAgentId: elena?.id,
     },
   ];
@@ -239,7 +258,7 @@ async function main() {
     }
   }
 
-  console.log('Seed completed successfully with Agents, Courses, Leads, and Calls.');
+  console.log('Seed completed successfully with dynamic courses, agents, and sample leads.');
 }
 
 main()

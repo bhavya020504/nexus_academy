@@ -46,7 +46,7 @@ model AgentCourse {
   createdAt  DateTime @default(now())
 
   agent      Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  course     Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  course     Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@unique([agentId, courseName])
 }
@@ -72,10 +72,11 @@ model Course {
   id          String        @id @default(cuid())
   title       String        @unique
   description String
-  level       String
-  duration    String
-  price       Float
+  level       String        @default("Intermediate")
+  duration    String        @default("4 weeks")
+  price       Float         @default(499)
   slug        String        @unique
+  isActive    Boolean       @default(true)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

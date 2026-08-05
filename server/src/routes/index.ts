@@ -51,34 +51,41 @@ const callController = new CallController(callService);
 const analyticsController = new AnalyticsController(analyticsService);
 
 // Public Routes
-router.get('/courses', courseController.getCourses);
+router.get('/courses', courseController.getPublicCourses);
 router.post('/leads', leadController.createLead);
 router.post('/contact', leadController.createContactMessage);
 router.post('/admin/login', leadController.adminLogin);
 
-// Protected Admin Routes
-// Dashboard & Analytics
+// Protected Admin Routes - Dashboard & Analytics
 router.get('/admin/dashboard', requireAuth, analyticsController.getDashboardData);
 router.get('/admin/analytics', requireAuth, analyticsController.getAnalyticsData);
 
-// Leads Management
+// Protected Admin Routes - Course Management
+router.get('/admin/courses', requireAuth, courseController.getCourses);
+router.get('/admin/courses/:id', requireAuth, courseController.getCourseById);
+router.post('/admin/courses', requireAuth, courseController.createCourse);
+router.put('/admin/courses/:id', requireAuth, courseController.updateCourse);
+router.delete('/admin/courses/:id', requireAuth, courseController.deleteCourse);
+router.patch('/admin/courses/:id/toggle', requireAuth, courseController.toggleCourseActive);
+
+// Protected Admin Routes - Leads Management
 router.get('/admin/leads', requireAuth, leadController.getLeads);
 router.get('/admin/leads/:id', requireAuth, leadController.getLeadById);
 router.patch('/admin/leads/:id', requireAuth, leadController.updateLeadStatus);
 router.delete('/admin/leads/:id', requireAuth, leadController.deleteLead);
 
-// Agents Management
+// Protected Admin Routes - Agents Management
 router.get('/admin/agents', requireAuth, agentController.getAgents);
 router.get('/admin/agents/:id', requireAuth, agentController.getAgentById);
 router.post('/admin/agents', requireAuth, agentController.createAgent);
 router.put('/admin/agents/:id', requireAuth, agentController.updateAgent);
 router.delete('/admin/agents/:id', requireAuth, agentController.deleteAgent);
 
-// Calls Management
+// Protected Admin Routes - Calls Management
 router.get('/admin/calls', requireAuth, callController.getCalls);
 router.get('/admin/calls/:id', requireAuth, callController.getCallById);
 
-// Contact Messages
+// Protected Admin Routes - Contact Messages
 router.get('/admin/messages', requireAuth, leadController.getMessages);
 router.delete('/admin/messages/:id', requireAuth, leadController.deleteMessage);
 

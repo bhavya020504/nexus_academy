@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { AdminLayout } from '../../components/admin/AdminLayout'
 import { getAgents, createAgent, updateAgent, deleteAgent } from '../../services/adminService'
+import { getAdminCourses } from '../../services/courseService'
 import {
   Bot,
   Plus,
@@ -13,16 +14,20 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const AVAILABLE_COURSES = [
+const DEFAULT_COURSES = [
+  'Full Stack AI',
+  'Data Analytics',
+  'GenAI & LLM',
+  'AI Consulting',
+  'Python for AI',
   'Executive AI Leadership & Strategy',
   'Enterprise Generative AI & LLM Systems',
   'AI Product Management & Architecture',
-  'Prompt Engineering Mastery',
-  'AI Strategy Consulting Sprint',
 ]
 
 export function AdminAgentsPage() {
   const [agents, setAgents] = useState<any[]>([])
+  const [availableCourses, setAvailableCourses] = useState<string[]>(DEFAULT_COURSES)
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingAgent, setEditingAgent] = useState<any | null>(null)
@@ -35,20 +40,26 @@ export function AdminAgentsPage() {
   const [selectedCourses, setSelectedCourses] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
 
-  const fetchAgentsList = async () => {
+  const fetchData = async () => {
     setLoading(true)
     try {
-      const data = await getAgents()
-      setAgents(data)
+      const [agentsData, coursesData] = await Promise.all([
+        getAgents(),
+        getAdminCourses(),
+      ])
+      setAgents(agentsData)
+      if (coursesData && coursesData.length > 0) {
+        setAvailableCourses(coursesData.map((c: any) => c.title))
+      }
     } catch (err) {
-      toast.error('Failed to load agents.')
+      toast.error('Failed to load agents or course directory.')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchAgentsList()
+    fetchData()
   }, [])
 
   const openCreateModal = () => {
@@ -57,7 +68,7 @@ export function AdminAgentsPage() {
     setSnapserveAgentId('')
     setLanguages('English, Spanish')
     setIsActive(true)
-    setSelectedCourses([AVAILABLE_COURSES[0]])
+    setSelectedCourses([availableCourses[0] || 'Full Stack AI'])
     setIsModalOpen(true)
   }
 
@@ -109,7 +120,7 @@ export function AdminAgentsPage() {
         toast.success('New AI Agent configured successfully.')
       }
       setIsModalOpen(false)
-      fetchAgentsList()
+      fetchData()
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Error saving agent.')
     } finally {
@@ -162,7 +173,7 @@ export function AdminAgentsPage() {
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
           {loading ? (
             <div className="p-12 text-center text-slate-400 text-sm">
-              Loading AI Agents...
+              Loading AI Agents & Dynamic Course Directory...
             </div>
           ) : agents.length === 0 ? (
             <div className="p-12 text-center text-slate-500 text-sm">
@@ -345,10 +356,10 @@ export function AdminAgentsPage() {
 
                 <div>
                   <label className="block font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Supported Courses (Auto Routing)
+                    Supported Courses (Loaded Dynamically from Database)
                   </label>
                   <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-                    {AVAILABLE_COURSES.map((courseName) => {
+                    {availableCourses.map((courseName) => {
                       const isSelected = selectedCourses.includes(courseName)
                       return (
                         <div

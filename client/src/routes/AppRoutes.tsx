@@ -7,6 +7,7 @@ import { NotFoundPage } from '../pages/NotFound'
 
 import { AdminLoginPage } from '../pages/admin/AdminLogin'
 import { AdminDashboardPage } from '../pages/admin/AdminDashboard'
+import { AdminCoursesPage } from '../pages/admin/AdminCourses'
 import { AdminLeadsPage } from '../pages/admin/AdminLeads'
 import { AdminAgentsPage } from '../pages/admin/AdminAgents'
 import { AdminCallsPage } from '../pages/admin/AdminCalls'
@@ -46,6 +47,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <AdminDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/courses"
+        element={
+          <ProtectedRoute>
+            <AdminCoursesPage />
           </ProtectedRoute>
         }
       />

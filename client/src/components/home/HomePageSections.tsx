@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowRight, BarChart3, Bot, Brain, GraduationCap, Mic, Sparkles } from 'lucide-react'
 import { useForm } from 'react-hook-form'
@@ -8,6 +9,7 @@ import { companies, courses, faqs, features, services, stats, testimonials } fro
 import { SectionHeading } from '../common/SectionHeading'
 import { PrimaryButton } from '../common/PrimaryButton'
 import { submitLeadForm } from '../../services/leadService'
+import { getPublicCourses } from '../../services/courseService'
 import { leadFormSchema } from '../../utils/formSchemas'
 import type { z } from 'zod'
 
@@ -22,7 +24,35 @@ const iconMap = {
   Mic,
 }
 
+const DEFAULT_COURSES = [
+  'Full Stack AI',
+  'Data Analytics',
+  'GenAI & LLM',
+  'AI Consulting',
+  'Python for AI',
+  'Executive AI Leadership & Strategy',
+  'Enterprise Generative AI & LLM Systems',
+  'AI Product Management & Architecture',
+]
+
 export function HomePageSections() {
+  const [dbCourses, setDbCourses] = useState<string[]>(DEFAULT_COURSES)
+
+  useEffect(() => {
+    async function loadCourses() {
+      try {
+        const fetched = await getPublicCourses()
+        if (fetched && fetched.length > 0) {
+          const titles = fetched.map((c: any) => c.title)
+          setDbCourses(titles)
+        }
+      } catch (err) {
+        console.warn('Using default course offerings for dropdown fallback.')
+      }
+    }
+    loadCourses()
+  }, [])
+
   const {
     register,
     handleSubmit,
@@ -36,7 +66,7 @@ export function HomePageSections() {
       phone: '',
       companyName: '',
       industry: '',
-      interest: '',
+      interest: DEFAULT_COURSES[0],
       message: '',
     },
   })
@@ -135,18 +165,33 @@ export function HomePageSections() {
           </div>
           <form onSubmit={handleSubmit(onLeadSubmit)} className="grid gap-4 rounded-[28px] bg-white p-5 shadow-sm">
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-sm text-slate-700"><span className="mb-2 block">Full Name</span><input {...register('fullName')} className="w-full rounded-2xl border border-slate-200 px-4 py-3" placeholder="Alex Morgan" />{errors.fullName && <span className="mt-1 block text-xs text-red-600">{errors.fullName.message}</span>}</label>
-              <label className="text-sm text-slate-700"><span className="mb-2 block">Phone Number</span><input {...register('phone')} className="w-full rounded-2xl border border-slate-200 px-4 py-3" placeholder="+1 (555) 333-1010" />{errors.phone && <span className="mt-1 block text-xs text-red-600">{errors.phone.message}</span>}</label>
+              <label className="text-sm text-slate-700"><span className="mb-2 block font-medium">Full Name</span><input {...register('fullName')} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-slate-900 focus:outline-none focus:border-blue-500" placeholder="Alex Morgan" />{errors.fullName && <span className="mt-1 block text-xs text-red-600">{errors.fullName.message}</span>}</label>
+              <label className="text-sm text-slate-700"><span className="mb-2 block font-medium">Phone Number</span><input {...register('phone')} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-slate-900 focus:outline-none focus:border-blue-500" placeholder="+1 (555) 333-1010" />{errors.phone && <span className="mt-1 block text-xs text-red-600">{errors.phone.message}</span>}</label>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-sm text-slate-700"><span className="mb-2 block">Email</span><input {...register('email')} className="w-full rounded-2xl border border-slate-200 px-4 py-3" placeholder="alex@company.com" />{errors.email && <span className="mt-1 block text-xs text-red-600">{errors.email.message}</span>}</label>
-              <label className="text-sm text-slate-700"><span className="mb-2 block">Company Name</span><input {...register('companyName')} className="w-full rounded-2xl border border-slate-200 px-4 py-3" placeholder="Nexa Labs" />{errors.companyName && <span className="mt-1 block text-xs text-red-600">{errors.companyName.message}</span>}</label>
+              <label className="text-sm text-slate-700"><span className="mb-2 block font-medium">Email</span><input {...register('email')} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-slate-900 focus:outline-none focus:border-blue-500" placeholder="alex@company.com" />{errors.email && <span className="mt-1 block text-xs text-red-600">{errors.email.message}</span>}</label>
+              <label className="text-sm text-slate-700"><span className="mb-2 block font-medium">Company Name</span><input {...register('companyName')} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-slate-900 focus:outline-none focus:border-blue-500" placeholder="Nexa Labs" />{errors.companyName && <span className="mt-1 block text-xs text-red-600">{errors.companyName.message}</span>}</label>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-sm text-slate-700"><span className="mb-2 block">Industry</span><input {...register('industry')} className="w-full rounded-2xl border border-slate-200 px-4 py-3" placeholder="Fintech" />{errors.industry && <span className="mt-1 block text-xs text-red-600">{errors.industry.message}</span>}</label>
-              <label className="text-sm text-slate-700"><span className="mb-2 block">Interested Service</span><input {...register('interest')} className="w-full rounded-2xl border border-slate-200 px-4 py-3" placeholder="AI Consulting" />{errors.interest && <span className="mt-1 block text-xs text-red-600">{errors.interest.message}</span>}</label>
+              <label className="text-sm text-slate-700"><span className="mb-2 block font-medium">Industry</span><input {...register('industry')} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-slate-900 focus:outline-none focus:border-blue-500" placeholder="Fintech" />{errors.industry && <span className="mt-1 block text-xs text-red-600">{errors.industry.message}</span>}</label>
+              
+              {/* Searchable / Dynamic Course Dropdown */}
+              <label className="text-sm text-slate-700">
+                <span className="mb-2 block font-medium">Select Interested Course</span>
+                <select
+                  {...register('interest')}
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 bg-white text-slate-900 font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  {dbCourses.map((cTitle) => (
+                    <option key={cTitle} value={cTitle}>
+                      {cTitle}
+                    </option>
+                  ))}
+                </select>
+                {errors.interest && <span className="mt-1 block text-xs text-red-600">{errors.interest.message}</span>}
+              </label>
             </div>
-            <label className="text-sm text-slate-700"><span className="mb-2 block">Message</span><textarea {...register('message')} className="min-h-28 w-full rounded-2xl border border-slate-200 px-4 py-3" placeholder="Tell us how AI can support your team." />{errors.message && <span className="mt-1 block text-xs text-red-600">{errors.message.message}</span>}</label>
+            <label className="text-sm text-slate-700"><span className="mb-2 block font-medium">Message</span><textarea {...register('message')} className="min-h-28 w-full rounded-2xl border border-slate-200 px-4 py-3 text-slate-900 focus:outline-none focus:border-blue-500" placeholder="Tell us how AI can support your team." />{errors.message && <span className="mt-1 block text-xs text-red-600">{errors.message.message}</span>}</label>
             <div className="mt-1"><PrimaryButton type="submit" disabled={isSubmitting} className="w-full">{isSubmitting ? 'Submitting...' : 'Submit Request'}</PrimaryButton></div>
           </form>
         </div>
