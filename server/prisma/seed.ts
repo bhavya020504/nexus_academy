@@ -1,4 +1,4 @@
-import { PrismaClient, LeadStatus, CallStatus } from '@prisma/client';
+import { PrismaClient, LeadStatus } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -25,7 +25,7 @@ async function main() {
     },
   });
 
-  // 2. Seed Courses (including requested courses: Full Stack AI, Data Analytics, GenAI & LLM, AI Consulting, Python for AI, etc.)
+  // 2. Seed Courses
   const coursesData = [
     {
       title: 'Full Stack AI',
@@ -101,99 +101,15 @@ async function main() {
     },
   ];
 
-  const createdCourses: Record<string, string> = {};
   for (const c of coursesData) {
-    const course = await prisma.course.upsert({
+    await prisma.course.upsert({
       where: { slug: c.slug },
       update: c,
       create: c,
     });
-    createdCourses[c.title] = course.id;
   }
 
-  // 3. Seed Agents
-  const agentsData = [
-    {
-      name: 'Sarah Jenkins',
-      snapserveAgentId: '459',
-      languages: 'English, Spanish',
-      isActive: true,
-      supportedCourseNames: [
-        'Full Stack AI',
-        'Executive AI Leadership & Strategy',
-        'AI Consulting',
-      ],
-    },
-    {
-      name: 'Alex Rivera',
-      snapserveAgentId: '460',
-      languages: 'English, German',
-      isActive: true,
-      supportedCourseNames: [
-        'GenAI & LLM',
-        'Enterprise Generative AI & LLM Systems',
-        'Python for AI',
-      ],
-    },
-    {
-      name: 'Elena Rostova',
-      snapserveAgentId: '461',
-      languages: 'English, French',
-      isActive: true,
-      supportedCourseNames: [
-        'Data Analytics',
-        'AI Product Management & Architecture',
-        'Python for AI',
-      ],
-    },
-  ];
-
-  for (const a of agentsData) {
-    let agent = await prisma.agent.findFirst({
-      where: { snapserveAgentId: a.snapserveAgentId },
-    });
-
-    if (!agent) {
-      agent = await prisma.agent.create({
-        data: {
-          name: a.name,
-          snapserveAgentId: a.snapserveAgentId,
-          languages: a.languages,
-          isActive: a.isActive,
-        },
-      });
-    } else {
-      agent = await prisma.agent.update({
-        where: { id: agent.id },
-        data: {
-          name: a.name,
-          languages: a.languages,
-          isActive: a.isActive,
-        },
-      });
-    }
-
-    // Clear existing agentCourses links and recreate
-    await prisma.agentCourse.deleteMany({ where: { agentId: agent.id } });
-
-    for (const courseName of a.supportedCourseNames) {
-      const courseId = createdCourses[courseName] || null;
-      await prisma.agentCourse.create({
-        data: {
-          agentId: agent.id,
-          courseId,
-          courseName,
-        },
-      });
-    }
-  }
-
-  // Fetch agents for sample leads
-  const sarah = await prisma.agent.findFirst({ where: { snapserveAgentId: '459' } });
-  const alex = await prisma.agent.findFirst({ where: { snapserveAgentId: '460' } });
-  const elena = await prisma.agent.findFirst({ where: { snapserveAgentId: '461' } });
-
-  // 4. Seed Leads & Calls
+  // 3. Seed Sample Leads (without hardcoded mock agents)
   const sampleLeads = [
     {
       fullName: 'Marcus Vance',
@@ -204,7 +120,6 @@ async function main() {
       interest: 'Full Stack AI',
       source: 'Google Search',
       status: LeadStatus.QUALIFIED,
-      assignedAgentId: sarah?.id,
     },
     {
       fullName: 'Sophia Chen',
@@ -215,7 +130,6 @@ async function main() {
       interest: 'GenAI & LLM',
       source: 'LinkedIn Ad',
       status: LeadStatus.CONTACTED,
-      assignedAgentId: alex?.id,
     },
     {
       fullName: 'David Miller',
@@ -226,39 +140,17 @@ async function main() {
       interest: 'Data Analytics',
       source: 'Direct Referral',
       status: LeadStatus.CONVERTED,
-      assignedAgentId: elena?.id,
     },
   ];
 
   for (const leadData of sampleLeads) {
     const existing = await prisma.lead.findFirst({ where: { email: leadData.email } });
-    let lead;
     if (!existing) {
-      lead = await prisma.lead.create({ data: leadData });
-    } else {
-      lead = existing;
-    }
-
-    if (lead.assignedAgentId) {
-      const existingCall = await prisma.call.findFirst({ where: { leadId: lead.id } });
-      if (!existingCall) {
-        await prisma.call.create({
-          data: {
-            leadId: lead.id,
-            agentId: lead.assignedAgentId,
-            status: CallStatus.COMPLETED,
-            duration: Math.floor(Math.random() * 180) + 60,
-            recordingUrl: 'https://actions.google.com/sounds/v1/speech/person_speaking.ogg',
-            transcript: `Agent: Hello ${lead.fullName}, thank you for contacting AI Nexus Academy regarding ${lead.interest}.\nLead: Yes! I would like to learn more about the curriculum and start dates.\nAgent: Fantastic. Our next cohort starts next Monday with live mentorship.\nLead: Perfect, please send over the syllabus!`,
-            aiSummary: `Discussed ${lead.interest} program curriculum and enrollment dates. Lead expressed strong purchasing intent.`,
-            successEvaluation: 'HIGH_INTENT',
-          },
-        });
-      }
+      await prisma.lead.create({ data: leadData });
     }
   }
 
-  console.log('Seed completed successfully with dynamic courses, agents, and sample leads.');
+  console.log('Seed completed successfully with dynamic courses and initial leads. Agents are fetched live from SnapServe API.');
 }
 
 main()

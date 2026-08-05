@@ -9,8 +9,12 @@ export class AgentController {
     try {
       const agents = await this.agentService.getAgents();
       res.status(200).json({ success: true, data: agents });
-    } catch (error) {
-      next(error);
+    } catch (error: any) {
+      console.error('Error in getAgents controller:', error);
+      res.status(error.status || 500).json({
+        success: false,
+        message: error.message || 'Failed to fetch agents from SnapServe API',
+      });
     }
   };
 

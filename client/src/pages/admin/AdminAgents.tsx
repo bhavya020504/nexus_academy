@@ -11,6 +11,8 @@ import {
   XCircle,
   X,
   Globe,
+  Radio,
+  FileText,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -47,12 +49,12 @@ export function AdminAgentsPage() {
         getAgents(),
         getAdminCourses(),
       ])
-      setAgents(agentsData)
+      setAgents(agentsData || [])
       if (coursesData && coursesData.length > 0) {
         setAvailableCourses(coursesData.map((c: any) => c.title))
       }
     } catch (err) {
-      toast.error('Failed to load agents or course directory.')
+      toast.error('Failed to load agents from SnapServe or course directory.')
     } finally {
       setLoading(false)
     }
@@ -66,7 +68,7 @@ export function AdminAgentsPage() {
     setEditingAgent(null)
     setName('')
     setSnapserveAgentId('')
-    setLanguages('English, Spanish')
+    setLanguages('English')
     setIsActive(true)
     setSelectedCourses([availableCourses[0] || 'Full Stack AI'])
     setIsModalOpen(true)
@@ -75,9 +77,9 @@ export function AdminAgentsPage() {
   const openEditModal = (agent: any) => {
     setEditingAgent(agent)
     setName(agent.name)
-    setSnapserveAgentId(agent.snapserveAgentId)
-    setLanguages(agent.languages || 'English')
-    setIsActive(agent.isActive)
+    setSnapserveAgentId(agent.snapserveAgentId || String(agent.id))
+    setLanguages(agent.language || agent.languages || 'English')
+    setIsActive(agent.status === 'active' || agent.isActive)
     const existingCourses = agent.agentCourses?.map((ac: any) => ac.courseName) || []
     setSelectedCourses(existingCourses)
     setIsModalOpen(true)
@@ -108,7 +110,7 @@ export function AdminAgentsPage() {
           isActive,
           courseNames: selectedCourses,
         })
-        toast.success('Agent configuration updated.')
+        toast.success('Agent course mapping updated.')
       } else {
         await createAgent({
           name,
@@ -117,12 +119,12 @@ export function AdminAgentsPage() {
           isActive,
           courseNames: selectedCourses,
         })
-        toast.success('New AI Agent configured successfully.')
+        toast.success('New Agent configured successfully.')
       }
       setIsModalOpen(false)
       fetchData()
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Error saving agent.')
+      toast.error(err.response?.data?.message || 'Error saving agent configuration.')
     } finally {
       setSubmitting(false)
     }
@@ -130,19 +132,24 @@ export function AdminAgentsPage() {
 
   const handleToggleActive = async (agent: any) => {
     try {
-      const updated = await updateAgent(agent.id, { isActive: !agent.isActive })
-      toast.success(`Agent ${agent.name} is now ${!agent.isActive ? 'Active' : 'Inactive'}`)
-      setAgents((prev) => prev.map((a) => (a.id === agent.id ? updated : a)))
+      const newActive = !(agent.status === 'active' || agent.isActive)
+      await updateAgent(agent.id, { isActive: newActive })
+      toast.success(`Agent ${agent.name} status updated.`)
+      setAgents((prev) =>
+        prev.map((a) =>
+          a.id === agent.id ? { ...a, isActive: newActive, status: newActive ? 'active' : 'draft' } : a,
+        ),
+      )
     } catch (err) {
       toast.error('Failed to update agent status.')
     }
   }
 
   const handleDeleteAgent = async (agentId: string) => {
-    if (!window.confirm('Are you sure you want to delete this agent?')) return
+    if (!window.confirm('Are you sure you want to remove this agent mapping?')) return
     try {
       await deleteAgent(agentId)
-      toast.success('Agent removed.')
+      toast.success('Agent mapping removed.')
       setAgents((prev) => prev.filter((a) => a.id !== agentId))
     } catch (err) {
       toast.error('Failed to delete agent.')
@@ -157,7 +164,7 @@ export function AdminAgentsPage() {
           <div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Agent Management</h1>
             <p className="text-sm text-slate-400 mt-1">
-              Configure SnapServe AI agents and specify course handling rules for automatic lead routing.
+              Live SnapServe AI agents single source of truth with PostgreSQL course mapping.
             </p>
           </div>
           <button
@@ -165,7 +172,7 @@ export function AdminAgentsPage() {
             className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs tracking-wide uppercase transition shadow-lg shadow-blue-600/20 flex items-center gap-2"
           >
             <Plus className="h-4 w-4" />
-            <span>Configure New Agent</span>
+            <span>Configure Agent Mapping</span>
           </button>
         </div>
 
@@ -173,11 +180,11 @@ export function AdminAgentsPage() {
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
           {loading ? (
             <div className="p-12 text-center text-slate-400 text-sm">
-              Loading AI Agents & Dynamic Course Directory...
+              Fetching Live Agents from SnapServe API...
             </div>
           ) : agents.length === 0 ? (
             <div className="p-12 text-center text-slate-500 text-sm">
-              No AI agents configured yet.
+              No live agents returned from SnapServe.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -185,100 +192,115 @@ export function AdminAgentsPage() {
                 <thead className="bg-slate-950/80 border-b border-slate-800 uppercase tracking-wider text-slate-400 text-[10px] font-bold">
                   <tr>
                     <th className="px-5 py-4">Agent Name</th>
-                    <th className="px-5 py-4">SnapServe ID</th>
-                    <th className="px-5 py-4">Languages</th>
+                    <th className="px-5 py-4">SnapServe Agent ID</th>
                     <th className="px-5 py-4">Status</th>
-                    <th className="px-5 py-4">Supported Courses</th>
-                    <th className="px-5 py-4 text-center">Assigned Leads</th>
+                    <th className="px-5 py-4">Language</th>
+                    <th className="px-5 py-4">Agent Type</th>
+                    <th className="px-5 py-4">Description</th>
+                    <th className="px-5 py-4">Mapped Courses</th>
                     <th className="px-5 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {agents.map((agent) => (
-                    <tr key={agent.id} className="hover:bg-slate-800/40 transition">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold">
-                            <Bot className="h-4 w-4" />
+                  {agents.map((agent) => {
+                    const isAgentActive = agent.status === 'active' || agent.isActive
+                    return (
+                      <tr key={agent.snapserveAgentId || agent.id} className="hover:bg-slate-800/40 transition">
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold shrink-0">
+                              <Bot className="h-4 w-4" />
+                            </div>
+                            <span className="font-bold text-sm text-white">{agent.name}</span>
                           </div>
-                          <span className="font-bold text-sm text-white">{agent.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="font-mono text-blue-400 font-semibold bg-blue-500/10 px-2 py-1 rounded-md border border-blue-500/20">
-                          {agent.snapserveAgentId}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-slate-400">
-                        <div className="flex items-center gap-1.5">
-                          <Globe className="h-3.5 w-3.5 text-slate-500" />
-                          <span>{agent.languages}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <button
-                          onClick={() => handleToggleActive(agent)}
-                          className={`px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 transition ${
-                            agent.isActive
-                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-slate-800 text-slate-400 border border-slate-700'
-                          }`}
-                        >
-                          {agent.isActive ? (
-                            <>
-                              <CheckCircle2 className="h-3 w-3" /> Active
-                            </>
-                          ) : (
-                            <>
-                              <XCircle className="h-3 w-3" /> Inactive
-                            </>
-                          )}
-                        </button>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-1 max-w-xs">
-                          {agent.agentCourses && agent.agentCourses.length > 0 ? (
-                            agent.agentCourses.map((ac: any) => (
-                              <span
-                                key={ac.id}
-                                className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[10px] font-medium border border-slate-700"
-                              >
-                                {ac.courseName}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-slate-500 italic">None</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-center font-bold text-slate-200">
-                        {agent._count?.leads || 0}
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className="font-mono text-blue-400 font-semibold bg-blue-500/10 px-2.5 py-1 rounded-md border border-blue-500/20">
+                            {agent.snapserveAgentId || agent.id}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
                           <button
-                            onClick={() => openEditModal(agent)}
-                            className="p-1.5 rounded-lg bg-slate-800 text-blue-400 hover:bg-blue-600 hover:text-white transition"
+                            onClick={() => handleToggleActive(agent)}
+                            className={`px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 transition uppercase tracking-wider ${
+                              isAgentActive
+                                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                            }`}
                           >
-                            <Edit3 className="h-3.5 w-3.5" />
+                            {isAgentActive ? (
+                              <>
+                                <CheckCircle2 className="h-3 w-3" /> Active
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-3 w-3" /> {agent.status || 'Draft'}
+                              </>
+                            )}
                           </button>
-                          <button
-                            onClick={() => handleDeleteAgent(agent.id)}
-                            className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:bg-red-600 hover:text-white transition"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-5 py-4 text-slate-300">
+                          <div className="flex items-center gap-1.5">
+                            <Globe className="h-3.5 w-3.5 text-slate-400" />
+                            <span className="font-medium">{agent.language || agent.languages || 'en-IN'}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-slate-300">
+                          <div className="flex items-center gap-1.5">
+                            <Radio className="h-3.5 w-3.5 text-purple-400" />
+                            <span className="capitalize font-medium">{agent.agentType || 'general'}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-slate-400 max-w-xs">
+                          <div className="flex items-center gap-1.5">
+                            <FileText className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                            <span className="truncate">{agent.description || 'No description provided'}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex flex-wrap gap-1 max-w-xs">
+                            {agent.agentCourses && agent.agentCourses.length > 0 ? (
+                              agent.agentCourses.map((ac: any) => (
+                                <span
+                                  key={ac.id || ac.courseName}
+                                  className="px-2 py-0.5 rounded-md bg-blue-900/40 text-blue-300 text-[10px] font-medium border border-blue-700/50"
+                                >
+                                  {ac.courseName}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-slate-500 italic">Unmapped</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => openEditModal(agent)}
+                              className="p-1.5 rounded-lg bg-slate-800 text-blue-400 hover:bg-blue-600 hover:text-white transition"
+                              title="Edit Agent Mapping"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAgent(agent.id)}
+                              className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:bg-red-600 hover:text-white transition"
+                              title="Remove Agent Mapping"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </div>
 
-        {/* Modal for Create / Edit Agent */}
+        {/* Modal for Create / Edit Agent Mapping */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg p-6 relative shadow-2xl space-y-6">
@@ -295,9 +317,9 @@ export function AdminAgentsPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-white">
-                    {editingAgent ? 'Edit Agent Config' : 'Configure AI Agent'}
+                    {editingAgent ? 'Edit Agent Course Mapping' : 'Configure Agent Mapping'}
                   </h3>
-                  <p className="text-xs text-slate-400">Set up automatic routing rules for lead dispatch.</p>
+                  <p className="text-xs text-slate-400">Map SnapServe AI agent ID to courses for lead routing.</p>
                 </div>
               </div>
 
@@ -311,7 +333,7 @@ export function AdminAgentsPage() {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Sarah Jenkins"
+                    placeholder="e.g. Lead Qualification Agent"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
                   />
                 </div>
@@ -338,7 +360,7 @@ export function AdminAgentsPage() {
                       type="text"
                       value={languages}
                       onChange={(e) => setLanguages(e.target.value)}
-                      placeholder="English, Spanish"
+                      placeholder="en-IN, en-US"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500"
                     />
                   </div>
@@ -356,7 +378,7 @@ export function AdminAgentsPage() {
 
                 <div>
                   <label className="block font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Supported Courses (Loaded Dynamically from Database)
+                    Mapped Courses (Course Mapping Feature)
                   </label>
                   <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                     {availableCourses.map((courseName) => {
@@ -397,7 +419,7 @@ export function AdminAgentsPage() {
                     disabled={submitting}
                     className="px-5 py-2 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-500 shadow-lg shadow-blue-600/20 disabled:opacity-50"
                   >
-                    {submitting ? 'Saving...' : editingAgent ? 'Update Agent' : 'Create Agent'}
+                    {submitting ? 'Saving...' : editingAgent ? 'Update Agent Mapping' : 'Save Agent Mapping'}
                   </button>
                 </div>
               </form>

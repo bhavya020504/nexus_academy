@@ -24,6 +24,50 @@ export class AgentRepository {
     });
   }
 
+  async findBySnapserveAgentId(snapserveAgentId: string) {
+    return prisma.agent.findUnique({
+      where: { snapserveAgentId },
+      include: {
+        agentCourses: true,
+        _count: {
+          select: { leads: true, calls: true },
+        },
+      },
+    });
+  }
+
+  async syncSnapServeAgent(agent: {
+    id: number | string;
+    name: string;
+    status?: string;
+    language?: string;
+  }) {
+    const snapserveAgentId = String(agent.id);
+    const isActive = agent.status ? agent.status.toLowerCase() === 'active' : true;
+    const languages = agent.language || 'English';
+
+    return prisma.agent.upsert({
+      where: { snapserveAgentId },
+      update: {
+        name: agent.name,
+        isActive,
+        languages,
+      },
+      create: {
+        snapserveAgentId,
+        name: agent.name,
+        isActive,
+        languages,
+      },
+      include: {
+        agentCourses: true,
+        _count: {
+          select: { leads: true, calls: true },
+        },
+      },
+    });
+  }
+
   async findActiveAgentForCourse(courseName?: string | null) {
     if (!courseName) {
       return prisma.agent.findFirst({

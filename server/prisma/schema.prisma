@@ -27,7 +27,7 @@ enum LeadStatus {
 model Agent {
   id               String        @id @default(cuid())
   name             String
-  snapserveAgentId String
+  snapserveAgentId String        @unique
   languages        String        @default("English")
   isActive         Boolean       @default(true)
   createdAt        DateTime      @default(now())
