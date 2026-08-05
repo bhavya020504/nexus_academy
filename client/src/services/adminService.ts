@@ -70,7 +70,12 @@ export async function deleteAgent(id: string) {
   return response.data
 }
 
-export async function getCalls(filters?: { agentId?: string; status?: string; evaluation?: string }) {
+export async function getCalls(filters?: {
+  agentId?: string
+  status?: string
+  direction?: string
+  search?: string
+}) {
   const response = await api.get('/admin/calls', { params: filters })
   return response.data.data
 }
