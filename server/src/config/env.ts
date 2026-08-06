@@ -8,7 +8,7 @@ console.log("Base URL:", process.env.SNAPSERVE_BASE_URL);
 
 export const env = {
   port: Number(process.env.PORT ?? 4000),
-  jwtSecret: process.env.JWT_SECRET ?? 'placeholder-secret',
+  jwtSecret: process.env.JWT_SECRET || 'AI_NEXUS_SUPER_SECRET_2026_CHANGE_ME',
   databaseUrl: process.env.DATABASE_URL ?? 'postgresql://user:password@localhost:5432/runit',
   nodeEnv: process.env.NODE_ENV ?? 'development',
   snapserveApiKey: process.env.SNAPSERVE_API_KEY ?? '',
