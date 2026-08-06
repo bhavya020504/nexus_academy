@@ -52,18 +52,16 @@ export function AdminAnalyticsPage() {
     )
   }
 
-  const {
-    leadsByCourse,
-    callsByAgent,
-    leadStatusDistribution,
-    dailyLeads,
-    monthlyLeads,
-    callSuccessRate,
-  } = data
+  const leadsByCourse = data?.leadsByCourse || []
+  const callsByAgent = data?.callsByAgent || []
+  const leadStatusDistribution = data?.leadStatusDistribution || []
+  const dailyLeads = data?.dailyLeads || []
+  const monthlyLeads = data?.monthlyLeads || []
+  const callSuccessRate = data?.callSuccessRate ?? 100
 
-  const maxCourseCount = Math.max(...leadsByCourse.map((c: any) => c.count), 1)
-  const maxDailyCount = Math.max(...dailyLeads.map((d: any) => d.count), 1)
-  const maxMonthlyCount = Math.max(...monthlyLeads.map((m: any) => m.count), 1)
+  const maxCourseCount = Math.max(...leadsByCourse.map((c: any) => c.count || 0), 1)
+  const maxDailyCount = Math.max(...dailyLeads.map((d: any) => d.count || 0), 1)
+  const maxMonthlyCount = Math.max(...monthlyLeads.map((m: any) => m.count || 0), 1)
 
   return (
     <AdminLayout>
