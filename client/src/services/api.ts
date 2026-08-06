@@ -17,3 +17,18 @@ api.interceptors.request.use((config) => {
   }
   return config
 })
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('nexus_admin_token')
+      localStorage.removeItem('nexus_admin_email')
+      if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/admin/login')) {
+        window.location.href = '/admin/login'
+      }
+    }
+    return Promise.reject(error)
+  },
+)
+

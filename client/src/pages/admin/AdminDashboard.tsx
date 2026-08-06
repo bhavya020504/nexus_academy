@@ -54,7 +54,14 @@ export function AdminDashboardPage() {
     )
   }
 
-  const { metrics, recentActivity } = data
+  const metrics = data?.metrics || {
+    totalLeads: 0,
+    todayLeads: 0,
+    pendingLeads: 0,
+    completedCalls: 0,
+    activeAgents: 0,
+  }
+  const recentActivity = data?.recentActivity || { leads: [], calls: [] }
 
   const statCards = [
     {
